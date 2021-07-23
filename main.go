@@ -144,7 +144,7 @@ func init() {
 		flag.Parse()
 	}
 	if *showVersion {
-		fmt.Fprintf(os.Stderr, "github.com/szampardi/msg/cmd/xprint version %s (%s) built %s\n", semver, commit, built)
+		fmt.Fprintf(os.Stderr, "github.com/szampardi/xprint version %s (%s) built %s\n", semver, commit, built)
 		os.Exit(0)
 	}
 	if *showFns {
