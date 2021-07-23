@@ -22,15 +22,15 @@ type (
 )
 
 var (
-	fnTrackChan        chan (*fnTrack) = make(chan *fnTrack)
-	startTracingOnce   sync.Once
-	debugAllFunctions                  = false
-	DebuggingWaitGroup *sync.WaitGroup = &sync.WaitGroup{}
+	fnTrackChan       chan (*fnTrack) = make(chan *fnTrack)
+	startTracingOnce  sync.Once
+	debugAllFunctions                 = false
+	Tracking          *sync.WaitGroup = &sync.WaitGroup{}
 )
 
 func trackUsage(_fn string, alwaysTrack bool, output interface{}, err error, args ...interface{}) {
 	if debugAllFunctions || alwaysTrack {
-		DebuggingWaitGroup.Add(1)
+		Tracking.Add(1)
 		fnTrackChan <- &fnTrack{
 			T:      time.Now(),
 			F:      _fn,
@@ -47,7 +47,7 @@ func usageDebugger() {
 		for x := range fnTrackChan {
 			j, _ := json.Marshal(x)
 			L.Warningf(string(j))
-			DebuggingWaitGroup.Done()
+			Tracking.Done()
 		}
 	}()
 }

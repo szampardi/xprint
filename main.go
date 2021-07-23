@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -29,11 +30,11 @@ var (
 	loglvl     log.Lvl                        = log.LNotice                                                  //
 	logcolor                                  = flag.Bool("c", false, "colorize output")                     ////
 	_templates []struct {
-		s      string
-		isFile bool
+		S      string
+		IsFile bool
 	}
 	unsafe                *bool    = flag.Bool("u", unsafeMode(), fmt.Sprintf("allow evaluation of dangerous template functions (%v)", temple.FnMap.UnsafeFuncs())) //
-	showFns               *bool    = flag.Bool("F", false, "print available template functions and exit")                                                           //
+	showFns               *bool    = flag.Bool("H", false, "print available template functions and exit")                                                           //
 	debug                 *bool    = flag.Bool("D", false, "debug init and template rendering activities")                                                          //
 	output                *os.File                                                                                                                                  //
 	argsfirst             *bool    = flag.Bool("a", false, "output arguments (if any) before stdin (if any), instead of the opposite")                              //
@@ -63,7 +64,7 @@ func logFmts() []string {
 
 func setFlags() {
 	flag.Func(
-		"f",
+		"F",
 		fmt.Sprintf("logging format (prefix) %v", logFmts()),
 		func(value string) error {
 			if v, ok := log.Formats[value]; ok {
@@ -87,26 +88,33 @@ func setFlags() {
 	)
 	flag.Func(
 		"t",
-		`template(s) (string or files). this flag can be specified more than once.
+		`template(s) (string). this flag can be specified more than once.
 the last template specified in the commandline will be executed,
 the others can be accessed with the "template" Action.
 `,
 		func(value string) error {
-			if *debug {
-				temple.StartTracking()
-			}
+			_templates = append(_templates, struct {
+				S      string
+				IsFile bool
+			}{value, false})
+			return nil
+		},
+	)
+	flag.Func(
+		"f",
+		`template(s) (files). this flag can be specified more than once.
+the last template specified in the commandline will be executed,
+the others can be accessed with the "template" Action.
+`,
+		func(value string) error {
 			_, err := os.Stat(value)
-			if err == nil {
-				_templates = append(_templates, struct {
-					s      string
-					isFile bool
-				}{value, true})
-			} else {
-				_templates = append(_templates, struct {
-					s      string
-					isFile bool
-				}{value, false})
+			if err != nil {
+				return err
 			}
+			_templates = append(_templates, struct {
+				S      string
+				IsFile bool
+			}{value, true})
 			return nil
 		},
 	)
@@ -148,7 +156,7 @@ func init() {
 		os.Exit(0)
 	}
 	if *showFns {
-		os.Stderr.WriteString(temple.FnMap.HelpText())
+		_, err = os.Stderr.WriteString(temple.FnMap.HelpText())
 		if err != nil {
 			panic(err)
 		}
@@ -161,6 +169,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+	temple.L = l
 	if output != nil {
 		l.SetOutput(output)
 	}
@@ -183,10 +192,11 @@ func init() {
 }
 
 func main() {
+	if *debug {
+		temple.DebugHTTPRequests = true
+	}
+	temple.StartTracking()
 	if *server != "" {
-		if *debug {
-			temple.DebugHTTPRequests = true
-		}
 		if output == nil {
 			output = os.Stderr
 		}
@@ -217,25 +227,26 @@ func main() {
 	}
 	buf := new(bytes.Buffer)
 	if len(_templates) > 0 {
-		log.Debugf("%v", _templates)
 		argTemplates := map[string]string{}
 		localTemplates := []string{}
 		for n, t := range _templates {
-			if !t.isFile {
-				argTemplates[fmt.Sprintf("opt%d", n)] = t.s
+			if !t.IsFile {
+				if len(t.S) > 0 {
+					argTemplates[fmt.Sprintf("opt%d", n)] = t.S
+				}
 			} else {
-				localTemplates = append(localTemplates, t.s)
+				localTemplates = append(localTemplates, t.S)
 			}
 		}
-		tpl, err := temple.FnMap.BuildTemplate(*unsafe, os.Args[0], "", argTemplates, localTemplates...)
+		tpl, tplList, err := temple.FnMap.BuildTemplate(*unsafe, hex.EncodeToString(temple.Random(12)), "", argTemplates, localTemplates...)
 		if err != nil {
 			panic(err)
 		}
-		if err := tpl.Execute(buf, data); err != nil {
+		if err := tpl.ExecuteTemplate(buf, tplList[0], data); err != nil {
 			panic(err)
 		}
 		if *debug {
-			temple.DebuggingWaitGroup.Wait()
+			temple.Tracking.Wait()
 		}
 	} else {
 		for _, s := range dataIndex {

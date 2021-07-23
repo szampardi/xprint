@@ -6,6 +6,7 @@ package temple
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"path/filepath"
 	"reflect"
@@ -54,25 +55,35 @@ func (t templeFnMap) UnsafeFuncs() []string {
 	return out
 }
 
-func (t templeFnMap) BuildTemplate(_unsafe bool, name, _template string, loadedFiles map[string]string, localFiles ...string) (*template.Template, error) {
+func (t templeFnMap) BuildTemplate(_unsafe bool, name, _template string, loadedFiles map[string]string, localFiles ...string) (*template.Template, []string, error) {
 	var err error
+	all := []string{}
 	tpl := template.New(name).Funcs(t.BuildFuncMap(_unsafe))
 	if _template != "" {
 		tpl, err = tpl.Parse(_template)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
+		all = append(all, name)
 	}
-	for name, content := range loadedFiles {
-		tpl, err = tpl.New(name).Parse(content)
+	for fname, content := range loadedFiles {
+		tpl, err = tpl.New(fname).Parse(content)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
+		all = append(all, fname)
 	}
 	if len(localFiles) > 0 {
-		return tpl.ParseFiles(localFiles...)
+		tpl, err = tpl.ParseFiles(localFiles...)
+		if err != nil {
+			return nil, nil, err
+		}
+		all = append(all, localFiles...)
 	}
-	return tpl, nil
+	if len(all) < 1 {
+		return nil, all, fmt.Errorf("no templates found")
+	}
+	return tpl, all, nil
 }
 
 func (t templeFnMap) HelpText() string {
@@ -240,9 +251,9 @@ var (
 			false,
 		},
 		"random": {
-			random,
+			Random,
 			"generate a $1 sized []byte filled with bytes from crypto.Rand",
-			reflect.TypeOf(random).String(),
+			reflect.TypeOf(Random).String(),
 			false,
 		},
 		"rawfile": {

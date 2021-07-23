@@ -454,7 +454,7 @@ func encrypt(in interface{}, b64key string, aad string) (out []byte, err error) 
 	if err != nil {
 		return nil, err
 	}
-	iv := random(aead.NonceSize())
+	iv := Random(aead.NonceSize())
 	var ctxt []byte
 	ctxt = aead.Seal(ctxt, iv, ptxt, []byte(aad))
 	out = append(ctxt, iv...)
@@ -578,8 +578,7 @@ func cmd(prog string, args ...string) (out string, err error) {
 	return out, err
 }
 
-func random(size int) (out []byte) {
-	defer trackUsage("random", false, &out, nil, size)
+func Random(size int) (out []byte) {
 	out = make([]byte, size)
 	_, err := io.ReadFull(rand.Reader, out)
 	if err != nil {

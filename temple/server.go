@@ -114,7 +114,7 @@ func RenderServer(fnMap templeFnMap) http.HandlerFunc {
 				return
 			}
 		}
-		tpl, err := fnMap.BuildTemplate(EnableUnsafeFunctions, "post", post.Template, post.Templates)
+		tpl, _, err := fnMap.BuildTemplate(EnableUnsafeFunctions, "post", post.Template, post.Templates)
 		if err != nil {
 			L.Errorf("request ( %s %s ) from %s: error building template.Template: %s", r.Method, r.URL, r.RemoteAddr, err)
 			w.WriteHeader(http.StatusBadRequest)
