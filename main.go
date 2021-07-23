@@ -17,7 +17,7 @@ import (
 	"strings"
 
 	log "github.com/szampardi/msg"
-	"github.com/szampardi/msg/cmd/xprint/temple"
+	"github.com/szampardi/xprint/temple"
 )
 
 var (
