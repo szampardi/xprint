@@ -1,5 +1,5 @@
-// Copyright (c) 2019-2021 SILVANO ZAMPARDI, All rights reserved.
-// This source code license can be found in the LICENSE file in the root directory of this source tree.
+// COPYRIGHT (c) 2019-2021 SILVANO ZAMPARDI, ALL RIGHTS RESERVED.
+// The license for these sources can be found in the LICENSE file in the root directory of this source tree.
 
 package main
 
