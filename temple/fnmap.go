@@ -7,11 +7,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
+	"text/template"
 )
 
 type (

@@ -242,6 +242,7 @@ func main() {
 			panic(err)
 		}
 		if err := tpl.ExecuteTemplate(buf, tplList[0], data); err != nil {
+			fmt.Println(os.Args)
 			panic(err)
 		}
 		if *debug {
