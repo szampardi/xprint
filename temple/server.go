@@ -10,7 +10,10 @@ import (
 	"io"
 	"net/http"
 	"net/http/httputil"
+	"strconv"
 	"strings"
+
+	log "github.com/szampardi/msg"
 )
 
 type (
@@ -18,6 +21,8 @@ type (
 		Template  string            `json:"template,omitempty"`
 		Templates map[string]string `json:"templates,omitempty"`
 		Data      interface{}       `json:"data,omitempty"`
+		Outfile   string            `json:"outfile,omitempty"`
+		ForceDL   bool              `json:"forcedl,omitempty"`
 	}
 	jresp struct {
 		Status  int         `json:"status"`
@@ -28,18 +33,18 @@ type (
 
 func RenderServer(fnMap templeFnMap) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		L.Noticef("new request ( %s %s ) from %s", r.Method, r.URL, r.RemoteAddr)
+		log.Noticef("new request ( %s %s ) from %s", r.Method, r.URL, r.RemoteAddr)
 		if DebugHTTPRequests {
 			b, err := httputil.DumpRequest(r, true)
 			if err != nil {
-				L.Errorf("request ( %s %s ) from %s: error dumping request: %s", r.Method, r.URL, r.RemoteAddr, err)
+				log.Errorf("request ( %s %s ) from %s: error dumping request: %s", r.Method, r.URL, r.RemoteAddr, err)
 				http.Error(w, "", http.StatusInternalServerError)
 				return
 			}
-			L.Debugf("request ( %s %s ) from %s: %s", r.Method, r.URL, r.RemoteAddr, string(b))
+			log.Debugf("request ( %s %s ) from %s: %s", r.Method, r.URL, r.RemoteAddr, string(b))
 		}
 		if r.Method != http.MethodPost {
-			L.Errorf("rejected request ( %s %s ) from %s: bad method", r.Method, r.URL, r.RemoteAddr)
+			log.Errorf("rejected request ( %s %s ) from %s: bad method", r.Method, r.URL, r.RemoteAddr)
 			bye(w, r)
 			return
 		}
@@ -53,7 +58,7 @@ func RenderServer(fnMap templeFnMap) http.HandlerFunc {
 		if multipart {
 			mr, err := r.MultipartReader()
 			if err != nil {
-				L.Errorf("request ( %s %s ) from %s: error in request.MultipartReader: %s", r.Method, r.URL, r.RemoteAddr, err)
+				log.Errorf("request ( %s %s ) from %s: error in request.MultipartReader: %s", r.Method, r.URL, r.RemoteAddr, err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -71,7 +76,7 @@ func RenderServer(fnMap templeFnMap) http.HandlerFunc {
 					buf := new(bytes.Buffer)
 					_, err = io.Copy(buf, part)
 					if err != nil {
-						L.Errorf("request ( %s %s ) from %s: error reading part %s request.MultipartReader: %s", r.Method, r.URL, r.RemoteAddr, pname, err)
+						log.Errorf("request ( %s %s ) from %s: error reading part %s request.MultipartReader: %s", r.Method, r.URL, r.RemoteAddr, pname, err)
 						http.Error(w, err.Error(), http.StatusInternalServerError)
 						return
 					}
@@ -80,7 +85,7 @@ func RenderServer(fnMap templeFnMap) http.HandlerFunc {
 					buf := new(bytes.Buffer)
 					_, err = io.Copy(buf, part)
 					if err != nil {
-						L.Errorf("request ( %s %s ) from %s: error reading part %s request.MultipartReader: %s", r.Method, r.URL, r.RemoteAddr, pname, err)
+						log.Errorf("request ( %s %s ) from %s: error reading part %s request.MultipartReader: %s", r.Method, r.URL, r.RemoteAddr, pname, err)
 						http.Error(w, err.Error(), http.StatusInternalServerError)
 						return
 					}
@@ -93,19 +98,41 @@ func RenderServer(fnMap templeFnMap) http.HandlerFunc {
 					buf := new(bytes.Buffer)
 					_, err = io.Copy(buf, part)
 					if err != nil {
-						L.Errorf("request ( %s %s ) from %s: error reading part %s request.MultipartReader: %s", r.Method, r.URL, r.RemoteAddr, pname, err)
+						log.Errorf("request ( %s %s ) from %s: error reading part %s request.MultipartReader: %s", r.Method, r.URL, r.RemoteAddr, pname, err)
 						http.Error(w, err.Error(), http.StatusInternalServerError)
 						return
 					}
 					if buf.Len() > 0 {
 						post.Templates[part.FileName()] = buf.String()
 					}
-
+				case "outfile":
+					buf := new(bytes.Buffer)
+					_, err = io.Copy(buf, part)
+					if err != nil {
+						log.Errorf("request ( %s %s ) from %s: error reading part %s request.MultipartReader: %s", r.Method, r.URL, r.RemoteAddr, pname, err)
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+						return
+					}
+					post.Outfile = buf.String()
+				case "forcedl":
+					buf := new(bytes.Buffer)
+					_, err = io.Copy(buf, part)
+					if err != nil {
+						log.Errorf("request ( %s %s ) from %s: error reading part %s request.MultipartReader: %s", r.Method, r.URL, r.RemoteAddr, pname, err)
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+						return
+					}
+					post.ForceDL, err = strconv.ParseBool(buf.String())
+					if err != nil {
+						log.Errorf("request ( %s %s ) from %s: error reading part %s request.MultipartReader: %s", r.Method, r.URL, r.RemoteAddr, pname, err)
+						http.Error(w, err.Error(), http.StatusBadRequest)
+						return
+					}
 				}
 			}
 		} else {
 			if err = json.NewDecoder(r.Body).Decode(&post); err != nil {
-				L.Warningf("error processing request ( %s %s ) from %s: json.Decode: %s", r.Method, r.URL, r.RemoteAddr, err)
+				log.Warningf("error processing request ( %s %s ) from %s: json.Decode: %s", r.Method, r.URL, r.RemoteAddr, err)
 				w.WriteHeader(http.StatusBadRequest)
 				json.NewEncoder(w).Encode(jresp{
 					Status: http.StatusBadRequest,
@@ -116,7 +143,7 @@ func RenderServer(fnMap templeFnMap) http.HandlerFunc {
 		}
 		tpl, _, err := fnMap.BuildTemplate(EnableUnsafeFunctions, "post", post.Template, post.Templates)
 		if err != nil {
-			L.Errorf("request ( %s %s ) from %s: error building template.Template: %s", r.Method, r.URL, r.RemoteAddr, err)
+			log.Errorf("request ( %s %s ) from %s: error building template.Template: %s", r.Method, r.URL, r.RemoteAddr, err)
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(jresp{
 				Status: http.StatusBadRequest,
@@ -127,7 +154,7 @@ func RenderServer(fnMap templeFnMap) http.HandlerFunc {
 		buf := new(bytes.Buffer)
 		ctypeBuf := bytes.NewBuffer(make([]byte, 512))
 		if err := tpl.Execute(io.MultiWriter(buf, ctypeBuf), post.Data); err != nil {
-			L.Warningf("error processing request ( %s %s ) from %s: tpL.Execute: %s", r.Method, r.URL, r.RemoteAddr, err)
+			log.Warningf("error processing request ( %s %s ) from %s: tplog.Execute: %s", r.Method, r.URL, r.RemoteAddr, err)
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(jresp{
 				Status: http.StatusInternalServerError,
@@ -135,38 +162,45 @@ func RenderServer(fnMap templeFnMap) http.HandlerFunc {
 			})
 			return
 		}
-		w.WriteHeader(http.StatusOK)
-		if (buf.Len() < (1 << 20)) && multipart {
+		if post.Outfile == "" {
+			post.Outfile = "rendered.out"
+		}
+		w.Header().Set("Expires", "0")
+		w.Header().Set("Content-Control", "private, no-transform, no-store, must-revalidate")
+		if (buf.Len() < (1 << 20)) && !post.ForceDL && multipart {
+			w.WriteHeader(http.StatusOK)
 			_, err = w.Write([]byte(fmt.Sprintf("%s\n%s", htmlHead, htmlArticle(buf.String()))))
 		} else {
-			ctype := http.DetectContentType(ctypeBuf.Bytes())
-			w.Header().Set("Content-Disposition", "attachment; filename=rendered.out")
-			w.Header().Set("Content-Type", ctype)
+			w.Header().Set("Content-Type", http.DetectContentType(ctypeBuf.Bytes()))
+			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", post.Outfile))
+			w.Header().Set("Content-Transfer-Encoding", "binary")
+			w.Header().Set("Content-Length", strconv.Itoa(buf.Len()))
+			w.WriteHeader(http.StatusOK)
 			_, err = io.Copy(w, buf)
 		}
 		if err != nil {
-			L.Errorf("error sending response to request ( %s %s ) from %s: %s", r.Method, r.URL, r.RemoteAddr, err)
+			log.Errorf("error sending response to request ( %s %s ) from %s: %s", r.Method, r.URL, r.RemoteAddr, err)
 		} else {
-			L.Infof("processed request ( %s %s ) from %s", r.Method, r.URL, r.RemoteAddr)
+			log.Infof("processed request ( %s %s ) from %s", r.Method, r.URL, r.RemoteAddr)
 		}
 	}
 }
 
 func UIPage(w http.ResponseWriter, r *http.Request) {
-	L.Noticef("new request ( %s %s ) from %s", r.Method, r.URL, r.RemoteAddr)
+	log.Noticef("new request ( %s %s ) from %s", r.Method, r.URL, r.RemoteAddr)
 	if DebugHTTPRequests {
 		b, _ := httputil.DumpRequest(r, true)
-		L.Debugf("request ( %s %s ) from %s: %s", r.Method, r.URL, r.RemoteAddr, string(b))
+		log.Debugf("request ( %s %s ) from %s: %s", r.Method, r.URL, r.RemoteAddr, string(b))
 	}
 	if r.Method != http.MethodGet || r.URL.Path != "/" {
-		L.Errorf("rejected request ( %s %s ) from %s: bad method or path", r.Method, r.URL, r.RemoteAddr)
+		log.Errorf("rejected request ( %s %s ) from %s: bad method or path", r.Method, r.URL, r.RemoteAddr)
 		bye(w, r)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 	_, err := fmt.Fprintf(w, "%s\n%s", htmlHead, htmlForm)
 	if err != nil {
-		L.Errorf("error writing response to request ( %s %s ) from %s: %s", r.Method, r.URL, r.RemoteAddr, err)
+		log.Errorf("error writing response to request ( %s %s ) from %s: %s", r.Method, r.URL, r.RemoteAddr, err)
 	}
 }
 
@@ -216,6 +250,15 @@ p { white-space: pre-line; }
 button {
 	margin-left :5px;
 	margin-top :5px;
+	color: white;
+	padding: 0.5rem;
+	font-family: sans-serif;
+	border-radius: 0.3rem;
+	cursor: pointer;
+	margin-top: 1rem;
+}
+.custom-file-label {
+	content: "add templates..";
 }
 code {
     white-space: pre-wrap;
@@ -228,26 +271,35 @@ code {
 	htmlForm = `
 <body>
 <div class="container">
-<form method="post" action="render" enctype="multipart/form-data">
+<form method="post" action="render" enctype="multipart/form-data" spellcheck="false">
     <p>
 		<label for="text">TEMPLATE</label>
-		<textarea class="text" name="template" id="template">hello {{.client}}, it's {{timestamp}}
+		<pre style="max-height: 50em; overflow: scroll;"><code class="codeblock"><textarea class="text" name="template" id="template">hello {{.client}}, it's {{timestamp}}
 
-{{fns}}</textarea>
+{{fns}}</textarea></code></pre>
 	</p>
 	<p>
 		<label for="text">DATA</label>
-		<textarea class="text" name="data" id="data">{"client": "You"}</textarea>
+		<pre style="max-height: 50em; overflow: scroll;"><code class="codeblock"><textarea class="text" name="data" id="data">{"client": "You"}</textarea></code></pre>
 	</p>
 	<p>
 	<div class="col-md-offset-2 col-md-10 btn-group">
-		<input type="file" id="templates" name="templates" accept="text/*" multiple/>
+		<p>
+			<input style="background-color:cyan" type="file" id="templates" name="templates" accept="text/*" multiple/>
+			<label class="custom-file-label" for="templates">upload more templates to include</label>
+		</p>
 
+		<p>
+			<input type="text" placeholder="rendered.out" name="outfile">
+			<label for="outfile">output filename</label>
 
-		<input type="submit" class="submit" value="Submit" />
+			<input type="checkbox" id="forcedl" name="forcedl" value="true">
+			<label for="forcedl">force download</label>
+		</p>
+	
 
-
-		<input type="reset" value="Reset" class="btn btn-danger pull-right"/>
+		<input style="background-color:green" type="submit" class="submit" value="Submit" />
+		<input style="background-color:indigo" type="reset" value="Reset" class="btn btn-danger pull-right"/>
 	</div>
 	</p>
 </form>

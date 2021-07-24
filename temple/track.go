@@ -5,10 +5,12 @@ package temple
 
 import (
 	"encoding/json"
-	"log"
+	"fmt"
 	"os"
 	"sync"
 	"time"
+
+	log "github.com/szampardi/msg"
 )
 
 type (
@@ -35,7 +37,7 @@ func trackUsage(_fn string, alwaysTrack bool, output interface{}, err error, arg
 			T:      time.Now(),
 			F:      _fn,
 			Args:   args[:],
-			Output: output,
+			Output: fmt.Sprintf("%#v", output),
 			Err:    err,
 		}
 	}
@@ -46,7 +48,7 @@ func usageDebugger() {
 		log.SetOutput(os.Stderr)
 		for x := range fnTrackChan {
 			j, _ := json.Marshal(x)
-			L.Warningf(string(j))
+			log.Warning(string(j))
 			Tracking.Done()
 		}
 	}()

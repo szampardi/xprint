@@ -561,20 +561,24 @@ func env(in string, or ...string) (out string) {
 	return ""
 }
 
-func cmd(prog string, args ...string) (out string, err error) {
+type cmdBuffers struct {
+	Stdout *bytes.Buffer
+	Stderr *bytes.Buffer
+}
+
+func cmd(prog string, args ...string) (out *cmdBuffers, err error) {
 	defer trackUsage("cmd", true, &out, err, prog, args[:])
 	x := exec.Command(prog, args...)
-	outbuf, errbuf := new(bytes.Buffer), new(bytes.Buffer)
-	x.Stderr = errbuf
-	x.Stdout = outbuf
+	out = &cmdBuffers{
+		new(bytes.Buffer),
+		new(bytes.Buffer),
+	}
+	x.Stderr = out.Stderr
+	x.Stdout = out.Stdout
 	err = x.Run()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	if errbuf.Len() > 0 {
-		err = fmt.Errorf("%s error: %s", prog, errbuf.String())
-	}
-	out = outbuf.String()
 	return out, err
 }
 

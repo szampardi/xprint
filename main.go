@@ -33,14 +33,13 @@ var (
 		S      string
 		IsFile bool
 	}
-	unsafe                *bool    = flag.Bool("u", unsafeMode(), fmt.Sprintf("allow evaluation of dangerous template functions (%v)", temple.FnMap.UnsafeFuncs())) //
-	showFns               *bool    = flag.Bool("H", false, "print available template functions and exit")                                                           //
-	debug                 *bool    = flag.Bool("D", false, "debug init and template rendering activities")                                                          //
-	output                *os.File                                                                                                                                  //
-	argsfirst             *bool    = flag.Bool("a", false, "output arguments (if any) before stdin (if any), instead of the opposite")                              //
-	showVersion           *bool    = flag.Bool("v", false, "print build version/date and exit")                                                                     //
-	server                *string  = flag.String("s", "", "start a render server on given address")                                                                 //
-	semver, commit, built          = "v0.0.0-dev", "local", "a while ago"                                                                                           //
+	showFns               *bool    = flag.Bool("H", false, "print available template functions and exit")                              //
+	debug                 *bool    = flag.Bool("D", false, "debug init and template rendering activities")                             //
+	output                *os.File                                                                                                     //
+	argsfirst             *bool    = flag.Bool("a", false, "output arguments (if any) before stdin (if any), instead of the opposite") //
+	showVersion           *bool    = flag.Bool("v", false, "print build version/date and exit")                                        //
+	server                *string  = flag.String("s", "", "start a render server on given address")                                    //
+	semver, commit, built          = "v0.0.0-dev", "local", "a while ago"                                                              //
 )
 
 func unsafeMode() bool {
@@ -53,7 +52,7 @@ func unsafeMode() bool {
 
 func logFmts() []string {
 	var out []string
-	for f := range log.Formats { // lets test them all
+	for f := range log.Formats {
 		if !strings.Contains(f, "rfc") {
 			out = append(out, f)
 		}
@@ -63,6 +62,7 @@ func logFmts() []string {
 }
 
 func setFlags() {
+	flag.BoolVar(&temple.EnableUnsafeFunctions, "u", unsafeMode(), fmt.Sprintf("allow evaluation of dangerous template functions (%v)", temple.FnMap.UnsafeFuncs()))
 	flag.Func(
 		"F",
 		fmt.Sprintf("logging format (prefix) %v", logFmts()),
@@ -169,7 +169,6 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	temple.L = l
 	if output != nil {
 		l.SetOutput(output)
 	}
@@ -238,7 +237,7 @@ func main() {
 				localTemplates = append(localTemplates, t.S)
 			}
 		}
-		tpl, tplList, err := temple.FnMap.BuildTemplate(*unsafe, hex.EncodeToString(temple.Random(12)), "", argTemplates, localTemplates...)
+		tpl, tplList, err := temple.FnMap.BuildTemplate(temple.EnableUnsafeFunctions, hex.EncodeToString(temple.Random(12)), "", argTemplates, localTemplates...)
 		if err != nil {
 			panic(err)
 		}
