@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,13 +23,13 @@ import (
 )
 
 var (
-	l          log.Logger                                                                                    //
-	data       = make(map[string]interface{})                                                                //
-	dataIndex  []string                                                                                      //
-	name                                      = flag.String("n", os.Args[0], "set name for verbose logging") //
-	logfmt     log.Format                     = log.Formats[log.PlainFormat]                                 //
-	loglvl     log.Lvl                        = log.LNotice                                                  //
-	logcolor                                  = flag.Bool("c", false, "colorize output")                     ////
+	l          log.Logger                                                                                               //
+	data       = make(map[string]interface{})                                                                           //
+	dataIndex  []string                                                                                                 //
+	name                                      = flag.String("n", path.Base(os.Args[0]), "set name for verbose logging") //
+	logfmt     log.Format                     = log.Formats[log.PlainFormat]                                            //
+	loglvl     log.Lvl                        = log.LNotice                                                             //
+	logcolor                                  = flag.Bool("c", false, "colorize output")                                ////
 	_templates []struct {
 		S      string
 		IsFile bool
@@ -241,8 +242,13 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		if err := tpl.ExecuteTemplate(buf, tplList[0], data); err != nil {
-			fmt.Println(os.Args)
+
+		if len(tplList) > 1 {
+			err = tpl.Execute(buf, data)
+		} else {
+			err = tpl.ExecuteTemplate(buf, tplList[0], data)
+		}
+		if err != nil {
 			panic(err)
 		}
 		if *debug {

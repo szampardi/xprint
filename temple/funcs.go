@@ -566,9 +566,9 @@ func env(in string, or ...string) (out string) {
 }
 
 type cmdBuffers struct {
-	Stdout   *bytes.Buffer
-	Stderr   *bytes.Buffer
-	ExitCode *os.ProcessState
+	Stdout       *bytes.Buffer
+	Stderr       *bytes.Buffer
+	ProcessState *os.ProcessState
 }
 
 func cmd(prog string, args ...string) (out *cmdBuffers, err error) {
@@ -582,7 +582,11 @@ func cmd(prog string, args ...string) (out *cmdBuffers, err error) {
 	x.Stderr = out.Stderr
 	x.Stdout = out.Stdout
 	err = x.Run()
-	out.ExitCode = x.ProcessState
+	if x.ProcessState != nil {
+		out.ProcessState = x.ProcessState
+	} else {
+		out.ProcessState = &os.ProcessState{}
+	}
 	return out, err
 }
 

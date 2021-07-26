@@ -4,14 +4,13 @@
 package temple
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
 	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
 	"text/template"
+	"time"
 )
 
 type (
@@ -55,48 +54,9 @@ func (t templeFnMap) UnsafeFuncs() []string {
 	return out
 }
 
-func (t templeFnMap) BuildTemplate(_unsafe bool, name, _template string, loadedFiles map[string]string, localFiles ...string) (*template.Template, []string, error) {
-	var err error
-	all := []string{}
-	tpl := template.New(name).Funcs(t.BuildFuncMap(_unsafe))
-	if _template != "" {
-		tpl, err = tpl.Parse(_template)
-		if err != nil {
-			return nil, nil, err
-		}
-		all = append(all, name)
-	}
-	for fname, content := range loadedFiles {
-		tpl, err = tpl.New(fname).Parse(content)
-		if err != nil {
-			return nil, nil, err
-		}
-		all = append(all, fname)
-	}
-	if len(localFiles) > 0 {
-		tpl, err = tpl.ParseFiles(localFiles...)
-		if err != nil {
-			return nil, nil, err
-		}
-		all = append(all, localFiles...)
-	}
-	if len(all) < 1 {
-		return nil, all, fmt.Errorf("no templates found")
-	}
-	return tpl, all, nil
-}
-
 func (t templeFnMap) HelpText() string {
 	b, _ := json.MarshalIndent(t, "", "  ")
 	return string(b)
-}
-
-func render(t *template.Template, data interface{}) ([]byte, error) {
-	buf := new(bytes.Buffer)
-	if err := t.Execute(buf, data); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
 }
 
 /* src/text/template/funcs.go
@@ -158,6 +118,12 @@ var (
 			decrypt,
 			"decrypt data with AES_GCM: $1 ctxt, $2 base64 key, $3 AAD",
 			reflect.TypeOf(decrypt).String(),
+			false,
+		},
+		"duration": {
+			time.ParseDuration,
+			"time.ParseDuration",
+			reflect.TypeOf(time.ParseDuration).String(),
 			false,
 		},
 		"encrypt": {

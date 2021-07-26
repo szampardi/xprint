@@ -266,7 +266,7 @@ code {
 	overflow: auto;
 }
 </style>
-<title>xinput render</title>
+<title>xprint render</title>
 `
 	htmlForm = `
 <body>
