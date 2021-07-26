@@ -80,7 +80,7 @@ func fload(p string) (string, error) {
 		if i == 0 && strings.HasPrefix(t, "#!") {
 			continue
 		}
-		_, err = buf.WriteString(t)
+		_, err = buf.WriteString(fmt.Sprintf("%s\n", t))
 		if err != nil {
 			return "", err
 		}
