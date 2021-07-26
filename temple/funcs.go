@@ -140,6 +140,10 @@ func fromjson(in interface{}) (out interface{}, err error) {
 		if err = json.NewDecoder(t).Decode(&out); err != nil {
 			return nil, err
 		}
+	case *http.Response:
+		if err = json.NewDecoder(t.Body).Decode(&out); err != nil {
+			return nil, err
+		}
 	}
 	return out, nil
 }
@@ -562,8 +566,9 @@ func env(in string, or ...string) (out string) {
 }
 
 type cmdBuffers struct {
-	Stdout *bytes.Buffer
-	Stderr *bytes.Buffer
+	Stdout   *bytes.Buffer
+	Stderr   *bytes.Buffer
+	ExitCode *os.ProcessState
 }
 
 func cmd(prog string, args ...string) (out *cmdBuffers, err error) {
@@ -572,13 +577,12 @@ func cmd(prog string, args ...string) (out *cmdBuffers, err error) {
 	out = &cmdBuffers{
 		new(bytes.Buffer),
 		new(bytes.Buffer),
+		nil,
 	}
 	x.Stderr = out.Stderr
 	x.Stdout = out.Stdout
 	err = x.Run()
-	if err != nil {
-		return nil, err
-	}
+	out.ExitCode = x.ProcessState
 	return out, err
 }
 
@@ -591,9 +595,15 @@ func Random(size int) (out []byte) {
 	return out[:size]
 }
 
-func consumeReader(r io.Reader) ([]byte, error) {
+func consumeReader(in interface{}) ([]byte, error) {
+	var err error
 	buf := new(bytes.Buffer)
-	_, err := io.Copy(buf, r)
+	switch t := in.(type) {
+	case io.Reader:
+		_, err = io.Copy(buf, t)
+	case *http.Response:
+		_, err = io.Copy(buf, t.Body)
+	}
 	if err != nil {
 		return nil, err
 	}
