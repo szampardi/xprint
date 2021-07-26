@@ -23,13 +23,15 @@ import (
 )
 
 var (
-	l          log.Logger                                                                                               //
-	data       = make(map[string]interface{})                                                                           //
-	dataIndex  []string                                                                                                 //
-	name                                      = flag.String("n", path.Base(os.Args[0]), "set name for verbose logging") //
-	logfmt     log.Format                     = log.Formats[log.PlainFormat]                                            //
-	loglvl     log.Lvl                        = log.LNotice                                                             //
-	logcolor                                  = flag.Bool("c", false, "colorize output")                                ////
+	l    log.Logger //
+	data            = struct {
+		Args  []string
+		Stdin string
+	}{} //
+	name                  = flag.String("n", path.Base(os.Args[0]), "set name for verbose logging") //
+	logfmt     log.Format = log.Formats[log.PlainFormat]                                            //
+	loglvl     log.Lvl    = log.LNotice                                                             //
+	logcolor              = flag.Bool("c", false, "colorize output")                                ////
 	_templates []struct {
 		S      string
 		IsFile bool
@@ -138,14 +140,6 @@ the others can be accessed with the "template" Action.
 	)
 }
 
-func appendData(args []string) {
-	for n, s := range args {
-		key := fmt.Sprintf("%s%d", "arg", n)
-		data[key] = s
-		dataIndex = append(dataIndex, key)
-	}
-}
-
 func init() {
 	var err error
 	setFlags()
@@ -173,22 +167,15 @@ func init() {
 	if output != nil {
 		l.SetOutput(output)
 	}
-	args := flag.Args()
-	if *argsfirst {
-		appendData(args)
-	} else {
-		defer appendData(args)
-	}
-	stdin, err := os.Stdin.Stat()
-	if err == nil && (stdin.Mode()&os.ModeCharDevice) == 0 {
+	if stdin, err := os.Stdin.Stat(); err == nil && (stdin.Mode()&os.ModeCharDevice) == 0 {
 		b, err := ioutil.ReadAll(os.Stdin)
 		if err != nil {
 			l.Errorf("reading %s: %s", stdin.Name(), err)
 		} else {
-			data["stdin"] = string(b)
-			dataIndex = append(dataIndex, "stdin")
+			data.Stdin = string(b)
 		}
 	}
+	data.Args = flag.Args()
 }
 
 func main() {
@@ -255,12 +242,27 @@ func main() {
 			temple.Tracking.Wait()
 		}
 	} else {
-		for _, s := range dataIndex {
-			_, err := fmt.Fprintf(buf, "%s", data[s])
-			if err != nil {
-				panic(err)
+		func() {
+			if !*argsfirst {
+				_, err := fmt.Fprintf(buf, "%s", data.Stdin)
+				if err != nil {
+					panic(err)
+				}
+			} else {
+				defer func() {
+					_, err := fmt.Fprintf(buf, "%s", data.Stdin)
+					if err != nil {
+						panic(err)
+					}
+				}()
 			}
-		}
+			for _, s := range data.Args {
+				_, err := fmt.Fprintf(buf, "%s", s)
+				if err != nil {
+					panic(err)
+				}
+			}
+		}()
 	}
 	if buf.Len() < 1 {
 		os.Exit(0)
