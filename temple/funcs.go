@@ -566,9 +566,17 @@ func env(in string, or ...string) (out string) {
 }
 
 type cmdBuffers struct {
-	Stdout       *bytes.Buffer
-	Stderr       *bytes.Buffer
+	stdout       *bytes.Buffer
+	stderr       *bytes.Buffer
 	ProcessState *os.ProcessState
+}
+
+func (c *cmdBuffers) Stdout() string {
+	return strings.TrimSpace(c.stdout.String())
+}
+
+func (c *cmdBuffers) Stderr() string {
+	return strings.TrimSpace(c.stderr.String())
 }
 
 func cmd(prog string, args ...string) (out *cmdBuffers, err error) {
@@ -579,8 +587,8 @@ func cmd(prog string, args ...string) (out *cmdBuffers, err error) {
 		new(bytes.Buffer),
 		nil,
 	}
-	x.Stderr = out.Stderr
-	x.Stdout = out.Stdout
+	x.Stderr = out.stderr
+	x.Stdout = out.stdout
 	err = x.Run()
 	if x.ProcessState != nil {
 		out.ProcessState = x.ProcessState
