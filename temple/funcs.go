@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	log "github.com/szampardi/msg"
 	"golang.org/x/term"
@@ -504,6 +505,46 @@ func decrypt(in interface{}, b64key string, aad string) (out []byte, err error) 
 		return nil, err
 	}
 	return out, nil
+}
+
+func is(s string, what string) bool {
+	if strings.HasPrefix(what, "|") {
+		switch x := strings.TrimPrefix(what, "|"); x {
+		case "u", "upper":
+			for _, r := range s {
+				if unicode.IsLetter(r) && unicode.IsLower(r) {
+					return false
+				}
+			}
+		case "l", "lower":
+			for _, r := range s {
+				if unicode.IsLetter(r) && unicode.IsUpper(r) {
+					return false
+				}
+			}
+		case "i", "int":
+			if _, err := strconv.Atoi(s); err != nil {
+				return false
+			}
+		case "f", "float":
+			if _, err := strconv.ParseFloat(s, 64); err != nil {
+				return false
+			}
+		case "f32", "float32":
+			if _, err := strconv.ParseFloat(s, 32); err != nil {
+				return false
+			}
+		case "b", "bool":
+			if s != "true" && s != "false" {
+				return false
+			}
+		default:
+			return s == what
+		}
+	} else {
+		return s == what
+	}
+	return true
 }
 
 func add(in interface{}, value interface{}, key ...interface{}) (out interface{}, err error) {

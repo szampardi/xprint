@@ -192,6 +192,12 @@ var (
 			reflect.TypeOf(_http).String(),
 			true,
 		},
+		"is": {
+			is,
+			"check if $1 is all |upper(case), |lower(case), |int, |float, |float32, |bool or ==$2",
+			reflect.TypeOf(is).String(),
+			false,
+		},
 		"join": {
 			strings.Join,
 			"strings.Join",
