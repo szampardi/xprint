@@ -5,11 +5,12 @@ package temple
 
 import (
 	"encoding/json"
+	htmlTpl "html/template"
 	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
-	"text/template"
+	textTpl "text/template"
 	"time"
 )
 
@@ -33,8 +34,18 @@ func (t templeFnMap) Fn(name, description string, funct interface{}, unsafe bool
 	}
 }
 
-func (t templeFnMap) BuildFuncMap(addUnsafeFuncs bool) template.FuncMap {
-	m := make(template.FuncMap)
+func (t templeFnMap) BuildFuncMap(addUnsafeFuncs bool) textTpl.FuncMap {
+	m := make(textTpl.FuncMap)
+	for name, info := range t {
+		if !info.Unsafe || addUnsafeFuncs {
+			m[name] = info._fn
+		}
+	}
+	return m
+}
+
+func (t templeFnMap) BuildHTMLFuncMap(addUnsafeFuncs bool) htmlTpl.FuncMap {
+	m := make(htmlTpl.FuncMap)
 	for name, info := range t {
 		if !info.Unsafe || addUnsafeFuncs {
 			m[name] = info._fn

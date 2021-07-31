@@ -168,8 +168,22 @@ func RenderServer(fnMap templeFnMap) http.HandlerFunc {
 		w.Header().Set("Expires", "0")
 		w.Header().Set("Content-Control", "private, no-transform, no-store, must-revalidate")
 		if (buf.Len() < (1 << 20)) && !post.ForceDL && multipart {
+			tpl, _, err := FnMap.BuildHTMLTemplate(false, "rendered", renderedPage, nil)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				log.Errorf("error building template for response to request ( %s %s ) from %s: %s", r.Method, r.URL, r.RemoteAddr, err)
+				return
+			}
+			rbuf := new(bytes.Buffer)
+			err = tpl.ExecuteTemplate(rbuf, "rendered", struct{ Output string }{buf.String()})
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				log.Errorf("error rendering template for response to request ( %s %s ) from %s: %s", r.Method, r.URL, r.RemoteAddr, err)
+				return
+			}
 			w.WriteHeader(http.StatusOK)
-			_, err = w.Write([]byte(fmt.Sprintf("%s\n%s", htmlHead, htmlArticle(buf.String()))))
+			_, err = w.Write(rbuf.Bytes())
+			//_, err = w.Write([]byte(fmt.Sprintf("%s\n%s", htmlHead, htmlArticle(buf.String()))))
 		} else {
 			w.Header().Set("Content-Type", http.DetectContentType(ctypeBuf.Bytes()))
 			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", post.Outfile))
@@ -186,26 +200,44 @@ func RenderServer(fnMap templeFnMap) http.HandlerFunc {
 	}
 }
 
-func UIPage(w http.ResponseWriter, r *http.Request) {
-	log.Noticef("new request ( %s %s ) from %s", r.Method, r.URL, r.RemoteAddr)
-	if DebugHTTPRequests {
-		b, _ := httputil.DumpRequest(r, true)
-		log.Debugf("request ( %s %s ) from %s: %s", r.Method, r.URL, r.RemoteAddr, string(b))
-	}
-	if r.Method != http.MethodGet || r.URL.Path != "/" {
-		log.Errorf("rejected request ( %s %s ) from %s: bad method or path", r.Method, r.URL, r.RemoteAddr)
-		bye(w, r)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-	_, err := fmt.Fprintf(w, "%s\n%s", htmlHead, htmlForm)
-	if err != nil {
-		log.Errorf("error writing response to request ( %s %s ) from %s: %s", r.Method, r.URL, r.RemoteAddr, err)
+func UIPage() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Noticef("new request ( %s %s ) from %s", r.Method, r.URL, r.RemoteAddr)
+		if DebugHTTPRequests {
+			b, _ := httputil.DumpRequest(r, true)
+			log.Debugf("request ( %s %s ) from %s: %s", r.Method, r.URL, r.RemoteAddr, string(b))
+		}
+		if r.Method != http.MethodGet || r.URL.Path != "/" {
+			log.Errorf("rejected request ( %s %s ) from %s: bad method or path", r.Method, r.URL, r.RemoteAddr)
+			bye(w, r)
+			return
+		}
+		tpl, _, err := FnMap.BuildHTMLTemplate(false, "ui", uiPage, nil)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			log.Errorf("error building template for response to request ( %s %s ) from %s: %s", r.Method, r.URL, r.RemoteAddr, err)
+			return
+		}
+		buf := new(bytes.Buffer)
+		err = tpl.ExecuteTemplate(buf, "ui", struct{ Raddr string }{r.RemoteAddr})
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			log.Errorf("error rendering template for response to request ( %s %s ) from %s: %s", r.Method, r.URL, r.RemoteAddr, err)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, err = w.Write(buf.Bytes())
+		//_, err := fmt.Fprintf(w, "%s\n%s", htmlHead, htmlForm)
+		if err != nil {
+			log.Errorf("error writing response to request ( %s %s ) from %s: %s", r.Method, r.URL, r.RemoteAddr, err)
+		}
 	}
 }
 
 const (
-	htmlHead = `
+	uiPage       = htmlHead + htmlForm
+	renderedPage = htmlHead + htmlArticle
+	htmlHead     = `
 <!DOCTYPE html>
 <meta name="viewport" charset="utf-8" content="width=device-width, initial-scale=1">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
@@ -218,25 +250,22 @@ Body {
 	font-family: Calibri, Helvetica, sans-serif;
 }
 .container {
-	margin:auto;
 	padding: 12px 20px;
-    position: absolute;
-    top: 50%;
-    left: 50%;
 	background: #eee;
-    -moz-transform: translateX(-50%) translateY(-50%);
-    -webkit-transform: translateX(-50%) translateY(-50%);
-    transform: translateX(-50%) translateY(-50%);
 	border-radius: 3px;
-	border: 5px solid;
+	border: 3px solid;
 	box-shadow: 0 1px 2px rgba(0, 0, 0, .1);
-	display: inline-block;
 	overflow:auto;
+	display: -webkit-flex;
+	-webkit-justify-content: center;
+	-webkit-align-items: center;
+	position: absolute;
+	display: table;
 }
 textarea {
 	display: inline-block;
-	min-width: 30em;
-	min-height: 20em;
+	min-width: 25em;
+	min-height: 15em;
 	overflow: auto;
 	resize: both;
 }
@@ -274,13 +303,12 @@ code {
 <form method="post" action="render" enctype="multipart/form-data" spellcheck="false">
     <p>
 		<label for="text">TEMPLATE</label>
-		<pre style="max-height: 50em; overflow: scroll;"><code class="codeblock"><textarea class="text" name="template" id="template">hello {{.client}}, it's {{timestamp}}
-
-{{fns}}</textarea></code></pre>
+		<pre style="max-height: 50em; overflow: scroll;"><code class="codeblock"><textarea class="text" name="template" id="template">` + "{{`hello {{.client}}, it's {{timestamp}}`}}" + `
+</textarea></code></pre>
 	</p>
 	<p>
 		<label for="text">DATA</label>
-		<pre style="max-height: 50em; overflow: scroll;"><code class="codeblock"><textarea class="text" name="data" id="data">{"client": "You"}</textarea></code></pre>
+		<pre style="max-height: 50em; overflow: scroll;"><code class="codeblock"><textarea class="text" name="data" id="data">{"client": "{{.Raddr}}"}</textarea></code></pre>
 	</p>
 	<p>
 	<div class="col-md-offset-2 col-md-10 btn-group">
@@ -307,22 +335,15 @@ code {
 </body>
 </html>
 `
-)
-
-func htmlArticle(text string) string {
-	return fmt.Sprintf(
-		"\n%s%s%s\n%s",
-		`<div class="container">
+	htmlArticle = `
+<div class="container">
 <article class="all-browsers">
-<pre style="max-height: 50em; overflow: scroll;"><code class="codeblock">`,
-		text,
-		`</code></pre>
-</article>`,
-		`</div>
+<pre style="max-height: 25em; overflow: scroll;"><code class="codeblock">{{.Output}}</code></pre>
+</article>
+</div>
 </body>
-</html>`,
-	)
-}
+</html>`
+)
 
 func bye(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "https://www.youtube.com/watch?v=dQw4w9WgXcQ?autoplay=1", http.StatusPermanentRedirect)

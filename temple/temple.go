@@ -7,10 +7,11 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	htmlTpl "html/template"
 	"os"
 	"path"
 	"strings"
-	"text/template"
+	textTpl "text/template"
 )
 
 var (
@@ -22,10 +23,10 @@ func init() {
 	defaultFnMapHelpText = FnMap.HelpText()
 }
 
-func (t templeFnMap) BuildTemplate(_unsafe bool, name, _template string, loadedFiles map[string]string, localFiles ...string) (*template.Template, []string, error) {
+func (t templeFnMap) BuildTemplate(_unsafe bool, name, _template string, loadedFiles map[string]string, localFiles ...string) (*textTpl.Template, []string, error) {
 	var err error
 	var all []string
-	tpl := template.New(name).Funcs(t.BuildFuncMap(_unsafe))
+	tpl := textTpl.New(name).Funcs(t.BuildFuncMap(_unsafe))
 	if _template != "" {
 		tpl, err = tpl.Parse(_template)
 		if err != nil {
@@ -59,12 +60,41 @@ func (t templeFnMap) BuildTemplate(_unsafe bool, name, _template string, loadedF
 	return tpl, all, nil
 }
 
-func render(t *template.Template, data interface{}) ([]byte, error) {
-	buf := new(bytes.Buffer)
-	if err := t.Execute(buf, data); err != nil {
-		return nil, err
+func (t templeFnMap) BuildHTMLTemplate(_unsafe bool, name, _template string, loadedFiles map[string]string, localFiles ...string) (*htmlTpl.Template, []string, error) {
+	var err error
+	var all []string
+	tpl := htmlTpl.New(name).Funcs(t.BuildHTMLFuncMap(_unsafe))
+	if _template != "" {
+		tpl, err = tpl.Parse(_template)
+		if err != nil {
+			return nil, nil, err
+		}
+		all = []string{path.Base(name)}
 	}
-	return buf.Bytes(), nil
+	for _, lft := range localFiles {
+		text, err := fload(lft)
+		if err != nil {
+			return nil, nil, err
+		}
+		n := path.Base(lft)
+		tpl, err = tpl.New(n).Parse(text)
+		if err != nil {
+			return nil, nil, err
+		}
+		all = append(all, n)
+	}
+	for fname, content := range loadedFiles {
+		fname = path.Base(fname)
+		tpl, err = tpl.New(fname).Parse(content)
+		if err != nil {
+			return nil, nil, err
+		}
+		all = append(all, fname)
+	}
+	if len(all) < 1 {
+		return nil, all, fmt.Errorf("no templates found")
+	}
+	return tpl, all, nil
 }
 
 func fload(p string) (string, error) {

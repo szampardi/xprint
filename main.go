@@ -39,6 +39,7 @@ var (
 	showFns               *bool    = flag.Bool("H", false, "print available template functions and exit")                              //
 	debug                 *bool    = flag.Bool("D", false, "debug init and template rendering activities")                             //
 	output                *os.File                                                                                                     //
+	isHTML                *bool    = flag.Bool("html", false, "use html/template instead of text/template")                            //
 	argsfirst             *bool    = flag.Bool("a", false, "output arguments (if any) before stdin (if any), instead of the opposite") //
 	showVersion           *bool    = flag.Bool("v", false, "print build version/date and exit")                                        //
 	server                *string  = flag.String("s", "", "start a render server on given address")                                    //
@@ -209,7 +210,7 @@ func main() {
 		}
 		l.Noticef("set up %s listener on %s", proto, lis.Addr().String())
 		http.HandleFunc("/render", temple.RenderServer(temple.FnMap))
-		http.HandleFunc("/", temple.UIPage)
+		http.HandleFunc("/", temple.UIPage())
 		panic(http.Serve(lis, nil).Error())
 	}
 	buf := new(bytes.Buffer)
@@ -225,15 +226,28 @@ func main() {
 				localTemplates = append(localTemplates, t.S)
 			}
 		}
-		tpl, tplList, err := temple.FnMap.BuildTemplate(temple.EnableUnsafeFunctions, hex.EncodeToString(temple.Random(12)), "", argTemplates, localTemplates...)
-		if err != nil {
-			panic(err)
-		}
-
-		if len(tplList) > 1 {
-			err = tpl.Execute(buf, data)
-		} else {
-			err = tpl.ExecuteTemplate(buf, tplList[0], data)
+		var err error
+		switch *isHTML {
+		case true:
+			tpl, tplList, err := temple.FnMap.BuildHTMLTemplate(temple.EnableUnsafeFunctions, hex.EncodeToString(temple.Random(12)), "", argTemplates, localTemplates...)
+			if err != nil {
+				panic(err)
+			}
+			if len(tplList) > 1 {
+				err = tpl.Execute(buf, data)
+			} else {
+				err = tpl.ExecuteTemplate(buf, tplList[0], data)
+			}
+		case false:
+			tpl, tplList, err := temple.FnMap.BuildTemplate(temple.EnableUnsafeFunctions, hex.EncodeToString(temple.Random(12)), "", argTemplates, localTemplates...)
+			if err != nil {
+				panic(err)
+			}
+			if len(tplList) > 1 {
+				err = tpl.Execute(buf, data)
+			} else {
+				err = tpl.ExecuteTemplate(buf, tplList[0], data)
+			}
 		}
 		if err != nil {
 			panic(err)
