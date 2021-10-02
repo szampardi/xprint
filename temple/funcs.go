@@ -26,7 +26,7 @@ import (
 
 	log "github.com/szampardi/msg"
 	"golang.org/x/term"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 func timestamp(tz ...string) time.Time {
