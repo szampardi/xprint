@@ -547,7 +547,28 @@ func is(s string, what string) bool {
 	return true
 }
 
-func add(in interface{}, value interface{}, key ...interface{}) (out interface{}, err error) {
+func math(b, a interface{}, x string) (interface{}, error) {
+	switch x {
+	case "+", "add":
+		return add(b, a)
+	case "/", "div":
+		return divide(b, a)
+	case "max":
+		return maximum(b, a)
+	case "min":
+		return minimum(b, a)
+	case "%", "mod":
+		return modulo(b, a)
+	case "x", "mul":
+		return multiply(b, a)
+	case "-", "sub":
+		return subtract(b, a)
+	default:
+		return nil, fmt.Errorf("unsupported method %s", x)
+	}
+}
+
+func mapadd(in interface{}, value interface{}, key ...interface{}) (out interface{}, err error) {
 	defer trackUsage("add", false, &out, err, in, value, key)
 	switch t := in.(type) {
 	case map[int]interface{}:
