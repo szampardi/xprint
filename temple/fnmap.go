@@ -101,12 +101,6 @@ func builtins() FuncMap {
 var (
 	defaultFnMapHelpText string
 	FnMap                = templeFnMap{
-		"add": {
-			add,
-			"add value $2 to map or slice $1, map needs $3 for value's key in map",
-			reflect.TypeOf(add).String(),
-			false,
-		},
 		"b64dec": {
 			b64dec,
 			"base64 decode",
@@ -225,6 +219,12 @@ var (
 			math,
 			"math operations (+, -, *, /, %, max, min)",
 			reflect.TypeOf(math).String(),
+			false,
+		},
+		"mapadd": {
+			add,
+			"add value $2 to map or slice $1, map needs $3 for value's key in map",
+			reflect.TypeOf(add).String(),
 			false,
 		},
 		"pathbase": {

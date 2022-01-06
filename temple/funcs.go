@@ -547,7 +547,7 @@ func is(s string, what string) bool {
 	return true
 }
 
-func math(b, a interface{}, x string) (interface{}, error) {
+func math(b interface{}, x string, a interface{}) (interface{}, error) {
 	switch x {
 	case "+", "add":
 		return add(b, a)
