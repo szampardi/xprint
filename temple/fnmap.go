@@ -221,6 +221,12 @@ var (
 			reflect.TypeOf(strings.ToLower).String(),
 			false,
 		},
+		"math": {
+			math,
+			"math operations (+, -, *, /, %, max, min)",
+			reflect.TypeOf(math).String(),
+			false,
+		},
 		"pathbase": {
 			filepath.Base,
 			"filepath.Base",
